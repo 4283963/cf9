@@ -35,8 +35,10 @@ public class ShuttleController {
     public ResponseEntity<List<ShuttleStatus>> getTrajectory(
             @PathVariable String shuttleId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startTime,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant endTime) {
-        List<ShuttleStatus> trajectory = shuttleDataService.getTrajectory(shuttleId, startTime, endTime);
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant endTime,
+            @RequestParam(defaultValue = "5000") int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 50000));
+        List<ShuttleStatus> trajectory = shuttleDataService.getTrajectory(shuttleId, startTime, endTime, safeLimit);
         return ResponseEntity.ok(trajectory);
     }
 
@@ -44,7 +46,8 @@ public class ShuttleController {
     public ResponseEntity<List<ShuttleStatus>> getTrajectoryLast(
             @PathVariable String shuttleId,
             @RequestParam(defaultValue = "10") int minutes) {
-        List<ShuttleStatus> trajectory = shuttleDataService.getTrajectoryLastMinutes(shuttleId, minutes);
+        int safeMinutes = Math.max(1, Math.min(minutes, 120));
+        List<ShuttleStatus> trajectory = shuttleDataService.getTrajectoryLastMinutes(shuttleId, safeMinutes);
         return ResponseEntity.ok(trajectory);
     }
 

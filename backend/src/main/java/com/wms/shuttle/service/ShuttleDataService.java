@@ -71,14 +71,22 @@ public class ShuttleDataService {
         }
     }
 
+    private static final int MAX_QUERY_MINUTES = 120;
+    private static final int DEFAULT_TRAJECTORY_LIMIT = 5000;
+
     public List<ShuttleStatus> getTrajectory(String shuttleId, Instant startTime, Instant endTime) {
-        return repository.queryTrajectory(shuttleId, startTime, endTime);
+        return repository.queryTrajectory(shuttleId, startTime, endTime, DEFAULT_TRAJECTORY_LIMIT);
+    }
+
+    public List<ShuttleStatus> getTrajectory(String shuttleId, Instant startTime, Instant endTime, int limit) {
+        return repository.queryTrajectory(shuttleId, startTime, endTime, limit);
     }
 
     public List<ShuttleStatus> getTrajectoryLastMinutes(String shuttleId, int minutes) {
+        int safeMinutes = Math.max(1, Math.min(minutes, MAX_QUERY_MINUTES));
         Instant end = Instant.now();
-        Instant start = end.minus(Duration.ofMinutes(minutes));
-        return repository.queryTrajectory(shuttleId, start, end);
+        Instant start = end.minus(Duration.ofMinutes(safeMinutes));
+        return repository.queryTrajectory(shuttleId, start, end, DEFAULT_TRAJECTORY_LIMIT);
     }
 
     public List<ShuttleStatus> getAllCurrentStatus() {

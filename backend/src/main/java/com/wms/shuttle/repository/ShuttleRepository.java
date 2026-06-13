@@ -48,7 +48,15 @@ public class ShuttleRepository {
         writeApi.writeMeasurements(WritePrecision.MS, points);
     }
 
+    private static final int DEFAULT_TRAJECTORY_LIMIT = 5000;
+    private static final int MAX_TRAJECTORY_LIMIT = 50000;
+
     public List<ShuttleStatus> queryTrajectory(String shuttleId, Instant startTime, Instant endTime) {
+        return queryTrajectory(shuttleId, startTime, endTime, DEFAULT_TRAJECTORY_LIMIT);
+    }
+
+    public List<ShuttleStatus> queryTrajectory(String shuttleId, Instant startTime, Instant endTime, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, MAX_TRAJECTORY_LIMIT));
         String flux = String.format(
             "from(bucket: \"%s\") " +
             "|> range(start: %d, stop: %d) " +
@@ -56,11 +64,13 @@ public class ShuttleRepository {
             "|> filter(fn: (r) => r[\"shuttleId\"] == \"%s\") " +
             "|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\") " +
             "|> keep(columns: [\"_time\", \"shuttleId\", \"level\", \"aisle\", \"x\", \"y\", \"z\", \"batteryLevel\", \"hasLoad\", \"speed\", \"status\"]) " +
-            "|> sort(columns: [\"_time\"]) ",
+            "|> sort(columns: [\"_time\"]) " +
+            "|> limit(n: %d) ",
             bucket,
             startTime.toEpochMilli() * 1000000,
             endTime.toEpochMilli() * 1000000,
-            shuttleId
+            shuttleId,
+            safeLimit
         );
 
         QueryApi queryApi = influxDBClient.getQueryApi();

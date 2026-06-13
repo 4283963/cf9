@@ -15,16 +15,17 @@ export async function getAllCurrentStatus() {
   return data
 }
 
-export async function getTrajectory(shuttleId, startTime, endTime) {
+export async function getTrajectory(shuttleId, startTime, endTime, limit = 5000) {
   const { data } = await api.get(`/trajectory/${shuttleId}`, {
-    params: { startTime, endTime }
+    params: { startTime, endTime, limit }
   })
   return data
 }
 
 export async function getTrajectoryLast(shuttleId, minutes = 10) {
+  const safeMinutes = Math.max(1, Math.min(minutes, 120))
   const { data } = await api.get(`/trajectory/${shuttleId}/last`, {
-    params: { minutes }
+    params: { minutes: safeMinutes }
   })
   return data
 }

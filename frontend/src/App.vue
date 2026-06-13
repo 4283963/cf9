@@ -232,6 +232,26 @@ function clearTrajectory() {
 }
 
 let unsubscribe = null
+let lastRenderUpdate = 0
+const RENDER_THROTTLE_MS = 200
+let pendingStatuses = null
+let renderRafId = null
+
+function scheduleRenderUpdate(statuses) {
+  pendingStatuses = statuses
+  if (renderRafId) return
+  renderRafId = requestAnimationFrame(() => {
+    renderRafId = null
+    const now = performance.now()
+    if (now - lastRenderUpdate >= RENDER_THROTTLE_MS && pendingStatuses && warehouse3dRef.value) {
+      lastRenderUpdate = now
+      warehouse3dRef.value.updateShuttles(pendingStatuses)
+      pendingStatuses = null
+    } else if (pendingStatuses) {
+      scheduleRenderUpdate(pendingStatuses)
+    }
+  })
+}
 
 onMounted(async () => {
   try {
@@ -251,9 +271,7 @@ onMounted(async () => {
       }
     }
 
-    if (warehouse3dRef.value) {
-      warehouse3dRef.value.updateShuttles(statuses)
-    }
+    scheduleRenderUpdate(statuses)
 
     if (shuttleIds.value.length === 0 && statuses.length > 0) {
       shuttleIds.value = statuses.map(s => s.shuttleId).sort()
@@ -264,6 +282,10 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  if (renderRafId) {
+    cancelAnimationFrame(renderRafId)
+    renderRafId = null
+  }
   if (unsubscribe) unsubscribe()
   wsService.disconnect()
 })
