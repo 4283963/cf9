@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: shuttle-twin-backend
+
+influxdb:
+  url: http://localhost:8086
+  token: my-super-secret-auth-token
+  org: wms-org
+  bucket: shuttle_data
+  connect-timeout: 10s
+  read-timeout: 30s
+  write-timeout: 10s
+
+simulation:
+  enabled: true
+  shuttle-count: 50
+  update-interval-ms: 100
+  warehouse:
+    aisles: 5
+    levels: 5
+    locations-per-aisle: 20
+    track-length: 40
+    track-width: 20
