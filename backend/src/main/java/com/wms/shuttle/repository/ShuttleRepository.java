@@ -15,7 +15,9 @@ import org.springframework.stereotype.Repository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Repository
 public class ShuttleRepository {
@@ -183,5 +185,42 @@ public class ShuttleRepository {
         if (value == null) return null;
         if (value instanceof Boolean) return (Boolean) value;
         return Boolean.parseBoolean(value.toString());
+    }
+
+    public List<Map<String, Object>> queryCurrentLoadHistory(String shuttleId, Instant startTime, Instant endTime, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, MAX_TRAJECTORY_LIMIT));
+        String flux = String.format(
+            "from(bucket: \"%s\") " +
+            "|> range(start: %d, stop: %d) " +
+            "|> filter(fn: (r) => r[\"_measurement\"] == \"shuttle_telemetry\") " +
+            "|> filter(fn: (r) => r[\"shuttleId\"] == \"%s\") " +
+            "|> filter(fn: (r) => r[\"_field\"] == \"currentLoad\" or r[\"_field\"] == \"hasFault\" or r[\"_field\"] == \"collisionValue\" or r[\"_field\"] == \"faultSeverity\") " +
+            "|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\") " +
+            "|> keep(columns: [\"_time\", \"currentLoad\", \"hasFault\", \"collisionValue\", \"faultSeverity\"]) " +
+            "|> sort(columns: [\"_time\"]) " +
+            "|> limit(n: %d) ",
+            bucket,
+            startTime.toEpochMilli() * 1000000,
+            endTime.toEpochMilli() * 1000000,
+            shuttleId,
+            safeLimit
+        );
+
+        QueryApi queryApi = influxDBClient.getQueryApi();
+        List<FluxTable> tables = queryApi.query(flux, org);
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (FluxTable table : tables) {
+            for (FluxRecord record : table.getRecords()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("timestamp", record.getTime().toString());
+                row.put("currentLoad", getDouble(record, "currentLoad"));
+                row.put("hasFault", getBoolean(record, "hasFault"));
+                row.put("collisionValue", getDouble(record, "collisionValue"));
+                row.put("faultSeverity", getDouble(record, "faultSeverity"));
+                result.add(row);
+            }
+        }
+        return result;
     }
 }

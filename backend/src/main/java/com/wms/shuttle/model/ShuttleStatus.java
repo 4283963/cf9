@@ -23,4 +23,9 @@ public class ShuttleStatus {
     private Double speed;
     private String status;
     private Instant timestamp;
+    private Double currentLoad;
+    private Boolean hasFault;
+    private String faultType;
+    private Double faultSeverity;
+    private Double collisionValue;
 }

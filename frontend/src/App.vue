@@ -30,6 +30,10 @@
             <span class="stat-value">{{ shuttleList.length - loadedCount }}</span>
             <span class="stat-label">空载</span>
           </div>
+          <div class="stat-item stat-fault" v-if="faultCount > 0">
+            <span class="stat-value">{{ faultCount }}</span>
+            <span class="stat-label">故障</span>
+          </div>
           <div class="stat-item stat-charging">
             <span class="stat-value">{{ chargingCount }}</span>
             <span class="stat-label">充电</span>
@@ -48,18 +52,23 @@
               v-for="shuttle in filteredShuttles"
               :key="shuttle.shuttleId"
               class="shuttle-item"
-              :class="{ active: selectedShuttleId === shuttle.shuttleId, loaded: shuttle.hasLoad }"
+              :class="{
+                active: selectedShuttleId === shuttle.shuttleId,
+                loaded: shuttle.hasLoad,
+                fault: shuttle.hasFault
+              }"
               @click="selectShuttle(shuttle)"
             >
               <div class="shuttle-id">
                 <span class="status-dot" :class="getStatusClass(shuttle)"></span>
                 {{ shuttle.shuttleId }}
+                <span v-if="shuttle.hasFault" class="fault-badge">⚠</span>
               </div>
               <div class="shuttle-meta">
                 <span class="battery" :class="{ low: shuttle.batteryLevel < 20 }">
                   {{ Math.round(shuttle.batteryLevel) }}%
                 </span>
-                <span class="speed">{{ shuttle.speed?.toFixed(1) }}m/s</span>
+                <span class="current-load">{{ (shuttle.currentLoad || 0).toFixed(1) }}A</span>
               </div>
             </div>
           </div>
@@ -98,9 +107,15 @@
               </span>
             </div>
             <div class="detail-row">
+              <span class="detail-label">电流</span>
+              <span class="detail-value" :class="{ 'fault-text': (selectedShuttle.currentLoad || 0) >= 10 }">
+                {{ (selectedShuttle.currentLoad || 0).toFixed(2) }} A
+              </span>
+            </div>
+            <div class="detail-row">
               <span class="detail-label">状态</span>
-              <span class="detail-value" :class="'status-' + selectedShuttle.status?.toLowerCase()">
-                {{ statusText(selectedShuttle.status) }}
+              <span class="detail-value" :class="selectedShuttle.hasFault ? 'fault-text' : 'status-' + selectedShuttle.status?.toLowerCase()">
+                {{ statusText(selectedShuttle.status, selectedShuttle.hasFault) }}
               </span>
             </div>
             <div class="detail-row">
@@ -109,8 +124,23 @@
                 {{ selectedShuttle.hasLoad ? '是' : '否' }}
               </span>
             </div>
+            <div class="detail-row" v-if="selectedShuttle.hasFault">
+              <span class="detail-label">故障类型</span>
+              <span class="detail-value fault-text">{{ selectedShuttle.faultType }}</span>
+            </div>
+            <div class="detail-row" v-if="selectedShuttle.hasFault">
+              <span class="detail-label">严重度</span>
+              <span class="detail-value fault-text">{{ ((selectedShuttle.faultSeverity || 0) * 100).toFixed(0) }}%</span>
+            </div>
+            <div class="detail-row" v-if="selectedShuttle.collisionValue > 0">
+              <span class="detail-label">撞轨值</span>
+              <span class="detail-value fault-text">{{ selectedShuttle.collisionValue?.toFixed(2) }}</span>
+            </div>
           </div>
           <button class="focus-btn" @click="focusShuttle">聚焦此车</button>
+          <button class="focus-btn secondary" v-if="selectedShuttle.hasFault" @click="clickFocusShuttle(selectedShuttle)">
+            查看故障诊断看板
+          </button>
         </div>
 
         <div class="section">
@@ -146,7 +176,10 @@
             <div class="legend-item"><span class="legend-dot" style="background:#ffcc00"></span>载货移动</div>
             <div class="legend-item"><span class="legend-dot" style="background:#44aaff"></span>取货中</div>
             <div class="legend-item"><span class="legend-dot" style="background:#ff8844"></span>放货中</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#ff4444"></span>充电中</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#ff4444"></span>充电/故障</div>
+          </div>
+          <div class="fault-alert" v-if="faultCount > 0">
+            ⚠ {{ faultCount }} 台穿梭车触发故障告警！点击红色故障车辆查看诊断看板
           </div>
         </div>
       </div>
@@ -175,6 +208,7 @@ const trajectoryCount = ref(0)
 
 const loadedCount = computed(() => shuttleList.value.filter(s => s.hasLoad).length)
 const chargingCount = computed(() => shuttleList.value.filter(s => s.status === 'CHARGING').length)
+const faultCount = computed(() => shuttleList.value.filter(s => s.hasFault).length)
 
 const filteredShuttles = computed(() => {
   let list = shuttleList.value
@@ -182,18 +216,23 @@ const filteredShuttles = computed(() => {
     const q = searchText.value.toLowerCase()
     list = list.filter(s => s.shuttleId.toLowerCase().includes(q))
   }
-  return list.sort((a, b) => a.shuttleId.localeCompare(b.shuttleId))
+  return list.sort((a, b) => {
+    if (!!b.hasFault !== !!a.hasFault) return b.hasFault - a.hasFault
+    return a.shuttleId.localeCompare(b.shuttleId)
+  })
 })
 
 function getStatusClass(shuttle) {
+  if (shuttle.hasFault) return 'fault'
   if (shuttle.status === 'CHARGING') return 'charging'
   if (shuttle.status === 'PICKING') return 'picking'
   if (shuttle.status === 'DROPPING') return 'dropping'
   return shuttle.hasLoad ? 'loaded' : 'empty'
 }
 
-function statusText(status) {
-  const map = { MOVING: '移动中', PICKING: '取货中', DROPPING: '放货中', CHARGING: '充电中' }
+function statusText(status, hasFault) {
+  if (hasFault) return '故障中 - ' + (status || 'STUCK')
+  const map = { MOVING: '移动中', PICKING: '取货中', DROPPING: '放货中', CHARGING: '充电中', FAULT_STUCK: '卡死', FAULT_COLLISION: '撞轨' }
   return map[status] || status
 }
 
@@ -206,6 +245,10 @@ function focusShuttle() {
   if (warehouse3dRef.value && selectedShuttleId.value) {
     warehouse3dRef.value.focusOnShuttle(selectedShuttleId.value)
   }
+}
+
+function clickFocusShuttle(shuttle) {
+  focusShuttle()
 }
 
 async function queryTrajectory() {
@@ -634,4 +677,63 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   display: inline-block;
 }
+
+.stat-fault .stat-value { color: #ff4444; animation: blink-fault 1s infinite; }
+.stat-fault { background: rgba(255, 68, 68, 0.1); border-color: #ff4444; }
+
+@keyframes blink-fault {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.status-dot.fault { background: #ff2222; box-shadow: 0 0 8px #ff2222; animation: blink-fault 0.8s infinite; }
+
+.shuttle-item.fault {
+  background: rgba(255, 50, 50, 0.08);
+  border: 1px solid rgba(255, 68, 68, 0.3);
+}
+
+.shuttle-item.fault .shuttle-id { color: #ff9090; }
+
+.fault-badge {
+  color: #ff4444;
+  font-size: 11px;
+  margin-left: 3px;
+  animation: blink-fault 0.8s infinite;
+}
+
+.current-load {
+  color: #6688aa;
+  font-family: 'SF Mono', Consolas, monospace;
+}
+
+.detail-value.fault-text {
+  color: #ff4444;
+  font-weight: 600;
+}
+
+.fault-alert {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 60, 60, 0.1);
+  border: 1px solid rgba(255, 68, 68, 0.4);
+  border-radius: 4px;
+  color: #ff8080;
+  font-size: 11px;
+  line-height: 1.5;
+  animation: pulse-alert 2s infinite;
+}
+
+@keyframes pulse-alert {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 68, 68, 0); }
+  50% { box-shadow: 0 0 12px rgba(255, 68, 68, 0.4); }
+}
+
+.focus-btn.secondary {
+  margin-top: 6px;
+  background: rgba(255, 50, 50, 0.1);
+  border-color: #ff4444;
+  color: #ff7777;
+}
+.focus-btn.secondary:hover { background: #ff4444; color: #fff; }
 </style>

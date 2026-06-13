@@ -46,6 +46,21 @@ public class ShuttleDataPoint {
     @Column
     private String status;
 
+    @Column
+    private Double currentLoad;
+
+    @Column
+    private Boolean hasFault;
+
+    @Column
+    private String faultType;
+
+    @Column
+    private Double faultSeverity;
+
+    @Column
+    private Double collisionValue;
+
     @Column(timestamp = true)
     private Instant timestamp;
 }

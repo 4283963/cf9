@@ -34,3 +34,11 @@ export async function getWarehouseConfig() {
   const { data } = await api.get('/warehouse/config')
   return data
 }
+
+export async function getCurrentLoadHistory(shuttleId, minutes = 10, limit = 3000) {
+  const safeMinutes = Math.max(1, Math.min(minutes, 120))
+  const { data } = await api.get(`/${shuttleId}/current-history`, {
+    params: { minutes: safeMinutes, limit }
+  })
+  return data
+}

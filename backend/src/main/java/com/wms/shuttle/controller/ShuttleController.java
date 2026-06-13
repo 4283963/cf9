@@ -60,4 +60,12 @@ public class ShuttleController {
                 "trackWidth", shuttleDataService.getTrackWidth()
         ));
     }
+
+    @GetMapping("/{shuttleId}/current-history")
+    public ResponseEntity<List<Map<String, Object>>> getCurrentLoadHistory(
+            @PathVariable String shuttleId,
+            @RequestParam(defaultValue = "10") int minutes,
+            @RequestParam(defaultValue = "3000") int limit) {
+        return ResponseEntity.ok(shuttleDataService.getCurrentLoadHistory(shuttleId, minutes, limit));
+    }
 }

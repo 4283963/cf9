@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
@@ -111,5 +112,13 @@ public class ShuttleDataService {
 
     public double getTrackWidth() {
         return simulator.getTrackWidth();
+    }
+
+    public List<Map<String, Object>> getCurrentLoadHistory(String shuttleId, int minutes, int limit) {
+        int safeMinutes = Math.max(1, Math.min(minutes, MAX_QUERY_MINUTES));
+        int safeLimit = Math.max(1, Math.min(limit, MAX_TRAJECTORY_LIMIT));
+        Instant end = Instant.now();
+        Instant start = end.minus(Duration.ofMinutes(safeMinutes));
+        return repository.queryCurrentLoadHistory(shuttleId, start, end, safeLimit);
     }
 }
